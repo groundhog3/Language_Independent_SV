@@ -7,9 +7,20 @@ import time #used to track processing time
 from data_class import Speaker_Verification as sv #parent class which contains shared fields
 from tabulate import tabulate as tb
 from scipy.stats.distributions import chi2
+import noisereduce as nr
+import scipy
 import sys
 
+def f_test(x, y, log1, log2):
+    f = np.var(x, ddof=1)/np.var(y, ddof=1) #calculate F test statistic 
+    #f = 2 * (log2-log1) #calculate F test statistic 
+    dfn = x.size-1 #define degrees of freedom numerator 
+    dfd = y.size-1 #define degrees of freedom denominator 
+    p = 1-scipy.stats.f.cdf(f, dfn, dfd) #find p-value of F test statistic 
+    return f, p
+
 exec(open("enrollment3.py").read()) #call enrollment script
+
 print('\n'+ sys.argv[0] + ' started.')
 # ## Loading Audio Files
 base = sv("main").base 
@@ -30,12 +41,12 @@ threshold_values = []
 for i in range(100, 1, -1):
     threshold_values.append(float(10**(-i)))
 
-threshold_values.extend(list(np.around(np.arange(0.02, 0.5, 0.01), decimals=3)))
-threshold_values.extend([0.9,1])
-threshold_values.insert(0,0)
+
+#threshold_values.extend(list(np.around(np.arange(0.02, 0.5, 0.01), decimals=3)))
+#threshold_values.extend([0.9,1])
+#threshold_values.insert(0,0)
 
 #threshold_values = [0, 0.01, 0.02, 0.04, 0.05, 0.07, 0.01, 0.2, 0.3,  1]
-
 likeh_ratio_array = []
 
 #this list will contain IDs of speakers. Ex. ["Al", "Bob", ...]
@@ -64,7 +75,7 @@ for i in range(len(validationFiles)):
     # extract mfcc features in an array
     mfccs2 = librosa.feature.mfcc(y=test2, sr=sr2, n_mfcc = n_mfcc,hop_length=hop_length)
 
-  
+    #print(validationFiles[i])
     #GMM of both MFCC feature vectors (array)
     gm1 = joblib.load(enrollment_pickle)
     gm2 = GaussianMixture(n_components=1, covariance_type='diag').fit(mfccs2)
@@ -78,10 +89,11 @@ for i in range(len(validationFiles)):
     
     #chi-square test of independence used to compare two models
     #Output: P-value
-    Λ = 2 * (log_like2-log_like1)
+    Λ = 2  * (log_like2-log_like1)
     df = int(2*(gm2.means_.shape[1])/ratio+1)  # df = degrees of freedom model 1 has over model 2
-    df = 2 #
+    df = 1 #
     likeh_ratio = chi2.sf(Λ, df) # this is a p value
+    #likeh_ratio = f_test(gm1.means_, gm2.means_, log_like1, log_like2)[1]
 
     likeh_ratio_array.append(likeh_ratio)
     
@@ -138,6 +150,5 @@ for t in range(len(threshold_values)):
             ['False Accept Rate (FAR)', str(round(FAR*100, 3))+'%'],
             ['False Reject Rate (FRR)', str(round(FRR*100, 3))+'%']], 
             headers=['Authentication Measure', 'Percentage']))'''
-
 
 

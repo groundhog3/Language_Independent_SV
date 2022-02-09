@@ -15,7 +15,10 @@ enrollment_base = sv("enrollment").enrollment_base
 enrollment = sv("enrollment").enrollment
 validation_length = sv("enrollment").validation_length
 
+enrollmentFiles = sv("enrollment").enrollmentFiles
+
 print('')
+print(enrollmentFiles)
 
 # load audio file and save audio file and sample rate
 enrollLib, sr1 = librosa.load(enrollment)
@@ -33,25 +36,34 @@ n_mfcc = sv("enrollment").n_mfcc #num of mfcc features extracted for each frame
 enrollLib = librosa.util.normalize(enrollLib)
 
 # extract mfcc features in an array
-mfccsEnroll = librosa.feature.mfcc(y=enrollLib, sr=sr1, n_mfcc = n_mfcc, hop_length=hop_length1)
-
-#create Gaussian Mixture Model
-gmmEnroll = GaussianMixture(n_components=1, covariance_type='diag', n_init = 500)
+mfccsEnroll = librosa.feature.mfcc(y=enrollLib, sr=sr1, n_mfcc = n_mfcc, hop_length=hop_length1, htk=True)
+#mfccsEnroll = zscore(mfccsEnroll, axis=1, ddof=100)
 
 num_of_cols = int((mfccsEnroll.shape[1])/(ratio))+1
 
 i=0
+count = 1
 while i < int(mfccsEnroll.shape[1]-num_of_cols):
     #print(i, i+num_of_cols-1)
     mfccsSub = mfccsEnroll[:, i:i+num_of_cols]
-    gmmEnroll.fit(mfccsSub)
-    i+=num_of_cols
+    gmmPart = GaussianMixture(n_components=1, covariance_type='diag', n_init = 100)
+    gmmPart.fit(mfccsSub)
 
+    #save model in pickle format for future use - saves on processing time
+    pkl_file = enrollment_base+f" #{count}.pkl"
+    joblib.dump(gmmPart, base+pkl_file) 
+    print(base+pkl_file +' file created', gmmPart.means_.shape)
+    i+=num_of_cols
+    count +=1
+
+mfccsSub = mfccsEnroll[:, -num_of_cols:]
+gmmPart = GaussianMixture(n_components=1, covariance_type='diag', n_init = 100)
+gmmPart.fit(mfccsSub)
 
 #save model in pickle format for future use - saves on processing time
-pkl_file = enrollment_base+".pkl"
-joblib.dump(gmmEnroll, base+pkl_file) 
+pkl_file = enrollment_base+f" #{count}.pkl"
+joblib.dump(gmmPart, base+pkl_file) 
 print(base+pkl_file +' file created')
-#print(gmmEnroll.means_.shape)
+print(gmmPart.means_.shape)
 
 print("Execution Time:--- %s seconds ---" % (time.time() - start_time)) 
